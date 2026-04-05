@@ -1,0 +1,153 @@
+---
+title: "EECS 545 Homework 5"
+author: "Huy Le"
+format:
+  pdf:
+    documentclass: article
+    geometry: margin=1in
+    fontsize: 11pt
+    number-sections: true
+---
+
+# K-means and GMM for Image Compression
+
+(b) 
+
+![K-means compression ($K=16$)](plots/1.1(b).png){width=90%}
+
+The mean pixel error is $14.61$.
+
+(e) A GMM with $K=5$ full-covariance components was trained via EM for 50 iterations on `mandrill-small.tiff`. The final log-likelihood converged to $-228103.43$.
+
+| $k$ | $\pi_k$ | $\boldsymbol{\mu}_k$ (R, G, B) |
+|:---:|:--------:|:-------------------------------:|
+| 1   | 0.13     | (180.22, 149.48, 116.78)       |
+| 2   | 0.43     | (125.08, 136.46, 114.67)       |
+| 3   | 0.11     | (233.67, \ 86.85, \ 67.54)     |
+| 4   | 0.21     | (\ 81.61, \ 89.01, \ 69.69)   |
+| 5   | 0.11     | (140.02, 189.46, 225.51)       |
+
+(f) Compressing `mandrill-large.tiff` via MAP assignment under the GMM gives a mean pixel error of $16.37$.
+
+![GMM compression ($K=5$)](plots/1.2(f).png){width=90%}
+
+
+# EM for GDA with Missing Labels
+
+(a) The labeled part of $\mathcal{J}$ is already a sum of log-probabilities so it stays as-is. For each unlabeled point $\mathbf{x}^{(i)}$, we introduce an arbitrary distribution $Q_{ij} = q_i(y^{(i)}=j)$ with $Q_{i0}+Q_{i1}=1$ and apply Jensen's inequality to the concave $\log$
+$$
+\log \sum_{j} p(\mathbf{x}^{(i)}, y^{(i)}\!=\!j)
+= \log \sum_{j} Q_{ij}\,\frac{p(\mathbf{x}^{(i)}, y^{(i)}\!=\!j)}{Q_{ij}}
+\;\geq\; \sum_{j} Q_{ij} \log \frac{p(\mathbf{x}^{(i)}, y^{(i)}\!=\!j)}{Q_{ij}}.
+$$
+Substituting back into $\mathcal{J}$ gives the lower bound
+$$
+\mathcal{L}(\boldsymbol{\mu},\boldsymbol{\Sigma},\phi) = \sum_{i=1}^{l}\log p(\mathbf{x}^{(i)},y^{(i)}) + \lambda \sum_{i=l+1}^{l+u}\sum_{j\in\{0,1\}} Q_{ij}\log\frac{p(\mathbf{x}^{(i)},y^{(i)}\!=\!j)}{Q_{ij}}. \quad\blacksquare
+$$
+
+(b) The bound is tightest when Jensen's inequality holds with equality, which happens when the ratio inside the $\log$ is constant in $j$. That forces $Q_{ij} \propto p(\mathbf{x}^{(i)}, y^{(i)}\!=\!j)$, and after normalizing we get
+$$
+Q_{ij} = \frac{p(\mathbf{x}^{(i)}, y^{(i)}\!=\!j)}{\sum_{k\in\{0,1\}} p(\mathbf{x}^{(i)}, y^{(i)}\!=\!k)} = p(y^{(i)}\!=\!j \mid \mathbf{x}^{(i)}) = \frac{\phi_j\,\mathcal{N}(\mathbf{x}^{(i)};\boldsymbol{\mu}_j,\boldsymbol{\Sigma}_j)}{\sum_k \phi_k\,\mathcal{N}(\mathbf{x}^{(i)};\boldsymbol{\mu}_k,\boldsymbol{\Sigma}_k)}.
+$$
+
+(c) Holding $Q_{ij}$ fixed, we maximize $\mathcal{L}$ w.r.t. $\boldsymbol{\mu}_k$. Only the Gaussian terms depend on $\boldsymbol{\mu}_k$, and from labeled data where $y^{(i)}\!=\!k$ we get the usual $-\frac{1}{2}(\mathbf{x}^{(i)}-\boldsymbol{\mu}_k)^\top\boldsymbol{\Sigma}_k^{-1}(\mathbf{x}^{(i)}-\boldsymbol{\mu}_k)$ terms while from unlabeled data the same expression appears weighted by $\lambda\,Q_{ik}$. Taking the derivative, setting it to zero, and cancelling $\boldsymbol{\Sigma}_k^{-1}$ yields
+$$
+\boldsymbol{\mu}_k = \frac{\displaystyle\sum_{i=1}^{l}\mathbb{1}[y^{(i)}\!=\!k]\,\mathbf{x}^{(i)} + \lambda\sum_{i=l+1}^{l+u}Q_{ik}\,\mathbf{x}^{(i)}}{\displaystyle\sum_{i=1}^{l}\mathbb{1}[y^{(i)}\!=\!k] + \lambda\sum_{i=l+1}^{l+u}Q_{ik}}.
+$$
+Intuitively this is the weighted average of all data attributed to class $k$, where labeled points contribute hard counts ($\mathbb{1}[y^{(i)}\!=\!k]$) and unlabeled points contribute soft pseudo-counts ($\lambda\,Q_{ik}$).
+
+(d) The terms in $\mathcal{L}$ involving $\phi$ are $\log\phi_j = \mathbb{1}[j\!=\!1]\log\phi + \mathbb{1}[j\!=\!0]\log(1\!-\!\phi)$, appearing in both labeled and unlabeled sums. Collecting everything and differentiating w.r.t. $\phi$ gives
+$$
+\frac{\partial\mathcal{L}}{\partial\phi} = \frac{\sum_{i=1}^l \mathbb{1}[y^{(i)}\!=\!1] + \lambda\sum_{i=l+1}^{l+u}Q_{i1}}{\phi} - \frac{\sum_{i=1}^l \mathbb{1}[y^{(i)}\!=\!0] + \lambda\sum_{i=l+1}^{l+u}Q_{i0}}{1-\phi} = 0
+$$
+$$
+\implies \phi = \frac{\displaystyle\sum_{i=1}^{l}\mathbb{1}[y^{(i)}\!=\!1] + \lambda\sum_{i=l+1}^{l+u}Q_{i1}}{l + \lambda\,u}.
+$$
+Intuitively $\phi$ is the fraction of effective class-1 counts over all effective counts, where labeled points cast hard votes and unlabeled points cast soft votes weighted by $\lambda\,Q_{i1}$.
+
+(e) By analogy with the M-step for $\boldsymbol{\mu}_k$ and the standard GDA/GMM covariance update, the M-step for $\boldsymbol{\Sigma}_k$ is
+$$
+\boldsymbol{\Sigma}_k = \frac{\displaystyle\sum_{i=1}^{l}\mathbb{1}[y^{(i)}\!=\!k]\,(\mathbf{x}^{(i)}-\boldsymbol{\mu}_k)(\mathbf{x}^{(i)}-\boldsymbol{\mu}_k)^\top + \lambda\sum_{i=l+1}^{l+u}Q_{ik}\,(\mathbf{x}^{(i)}-\boldsymbol{\mu}_k)(\mathbf{x}^{(i)}-\boldsymbol{\mu}_k)^\top}{\displaystyle\sum_{i=1}^{l}\mathbb{1}[y^{(i)}\!=\!k] + \lambda\sum_{i=l+1}^{l+u}Q_{ik}}.
+$$
+This is the weighted sample covariance around $\boldsymbol{\mu}_k$ with hard counts for labeled data and soft pseudo-counts $\lambda\,Q_{ik}$ for unlabeled data.
+
+
+# PCA and Eigenfaces
+
+(a) We can assume WLOG that $\bar{\mathbf{x}} = \mathbf{0}$ (zero-centered data). Let $\mathbf{X} \in \mathbb{R}^{D \times N}$ have the data points as columns so that $\mathbf{S} = \frac{1}{N}\mathbf{X}\mathbf{X}^\top$.
+
+Following Hint 2, we rewrite $\mathcal{J} = \frac{1}{N}\|\mathbf{X} - \mathbf{U}\mathbf{U}^\top\mathbf{X}\|_F^2$ and expand using $\|A\|_F^2 = \operatorname{tr}(A^\top A)$
+$$
+\|\mathbf{X} - \mathbf{U}\mathbf{U}^\top\mathbf{X}\|_F^2
+= \operatorname{tr}\big(\mathbf{X}^\top\mathbf{X} - 2\,\mathbf{X}^\top\mathbf{U}\mathbf{U}^\top\mathbf{X} + \mathbf{X}^\top\mathbf{U}\underbrace{\mathbf{U}^\top\mathbf{U}}_{\mathbf{I}_K}\mathbf{U}^\top\mathbf{X}\big)
+= \operatorname{tr}(\mathbf{X}^\top\mathbf{X}) - \operatorname{tr}(\mathbf{X}^\top\mathbf{U}\mathbf{U}^\top\mathbf{X}).
+$$
+The second trace can be cycled as $\operatorname{tr}(\mathbf{X}^\top\mathbf{U}\mathbf{U}^\top\mathbf{X}) = \operatorname{tr}(\mathbf{U}^\top\mathbf{X}\mathbf{X}^\top\mathbf{U})$, and after dividing by $N$ and recognizing $\mathbf{S}$ we get
+$$
+\mathcal{J} = \operatorname{tr}(\mathbf{S}) - \operatorname{tr}(\mathbf{U}^\top\mathbf{S}\,\mathbf{U}).
+$$
+Since eigenvalues sum to the trace we have $\operatorname{tr}(\mathbf{S}) = \sum_{i=1}^D\lambda_i$, and expanding $\mathbf{U} = [\mathbf{u}_1 \cdots \mathbf{u}_K]$ column-by-column gives $\operatorname{tr}(\mathbf{U}^\top\mathbf{S}\,\mathbf{U}) = \sum_{i=1}^K \mathbf{u}_i^\top\mathbf{S}\,\mathbf{u}_i$, so $\mathcal{J} = \sum_{i=1}^D\lambda_i - \sum_{i=1}^K \mathbf{u}_i^\top\mathbf{S}\,\mathbf{u}_i$ as claimed. $\blacksquare$
+
+The first sum is a constant we cannot control, so minimizing $\mathcal{J}$ amounts to making $\sum_{i=1}^K \mathbf{u}_i^\top\mathbf{S}\,\mathbf{u}_i$ as large as possible. By the Rayleigh--Ritz theorem this is maximized exactly when each $\mathbf{u}_i$ is the eigenvector for the $i$-th largest eigenvalue of $\mathbf{S}$, which gives $\mathbf{u}_i^\top\mathbf{S}\,\mathbf{u}_i = \lambda_i$. The minimum distortion is then $\sum_{i=1}^D\lambda_i - \sum_{i=1}^K\lambda_i = \sum_{k=K+1}^D\lambda_k$. $\blacksquare$
+
+(c) The first 10 eigenvalues (sorted in descending order) and a plot of all eigenvalues with log-scale $y$-axis are shown below.
+
+| Index | Eigenvalue |
+|:-----:|:-----------:|
+| 1     | 2,718,207.41 |
+| 2     | 2,610,783.99 |
+| 3     | 365,363.88   |
+| 4     | 211,062.37   |
+| 5     | 110,557.41   |
+| 6     | 104,672.42   |
+| 7     | 78,480.41    |
+| 8     | 67,004.29    |
+| 9     | 52,571.02    |
+| 10    | 49,176.70    |
+
+![Eigenvalue spectrum (log scale)](plots/3(c).png){width=80%}
+
+(d) The $2 \times 5$ grid below shows the mean face (top-left) followed by the first 9 eigenfaces.
+
+![Mean face and first 9 eigenfaces](plots/3(d).png){width=95%}
+
+PC 1 captures overall brightness and illumination level. PC 2 captures left--right lighting asymmetry. PC 3 picks up vertical variation related to overhead lighting or the presence of hair. PCs 4--5 start to encode facial structure like jawline and nose shape. PCs 6--9 capture finer details such as glasses, mouth shape, and eyebrows.
+
+(e) The total dimensionality is $L = 48\times 42 = 2016$. To preserve 95% of the total variance we need $K=43$ components (97.87% dimension reduction), and for 99% we need $K=167$ (91.72% reduction).
+
+
+# Independent Component Analysis
+
+(b) The learned $5\times 5$ unmixing matrix $W$ is
+$$
+W = \begin{pmatrix}
+ 72.151 &  28.624 &  25.910 & -17.232 & -21.191 \\
+ 13.459 &  31.944 &  -4.030 & -24.010 &  11.899 \\
+ 18.897 &  -7.804 &  28.715 &  18.144 & -21.175 \\
+ -6.012 &  -4.157 &  -1.017 &  13.873 &  -5.263 \\
+ -8.741 &  22.558 &   9.613 &  14.736 &  45.288
+\end{pmatrix}.
+$$
+
+
+# Conditional Variational Autoencoders
+
+(a) We introduce an approximate posterior $q_\phi(\mathbf{z}\mid\mathbf{x},\mathbf{y})$ and write the marginal as an expectation
+$$
+\log p_\theta(\mathbf{x}\mid\mathbf{y})
+= \log \int p_\theta(\mathbf{x},\mathbf{z}\mid\mathbf{y})\,d\mathbf{z}
+= \log\,\mathbb{E}_{q_\phi}\!\left[\frac{p_\theta(\mathbf{x},\mathbf{z}\mid\mathbf{y})}{q_\phi(\mathbf{z}\mid\mathbf{x},\mathbf{y})}\right].
+$$
+Since $\log$ is concave, Jensen's inequality gives us $\geq \mathbb{E}_{q_\phi}\!\big[\log\frac{p_\theta(\mathbf{x},\mathbf{z}\mid\mathbf{y})}{q_\phi(\mathbf{z}\mid\mathbf{x},\mathbf{y})}\big]$. We then factor $p_\theta(\mathbf{x},\mathbf{z}\mid\mathbf{y})=p_\theta(\mathbf{x}\mid\mathbf{z},\mathbf{y})\,p_\theta(\mathbf{z}\mid\mathbf{y})$ and split the log to obtain
+$$
+\log p_\theta(\mathbf{x}\mid\mathbf{y}) \geq \underbrace{\mathbb{E}_{q_\phi}\!\big[\log p_\theta(\mathbf{x}\mid\mathbf{z},\mathbf{y})\big] - D_{KL}(q_\phi(\mathbf{z}\mid\mathbf{x},\mathbf{y})\|p_\theta(\mathbf{z}\mid\mathbf{y}))}_{\mathcal{L}(\theta,\phi;\,\mathbf{x},\mathbf{y})}. \quad\blacksquare
+$$
+
+(b) By conditional independence (Eq. 16) the KL splits into $m$ univariate terms. For a single component $q=\mathcal{N}(\mu,\sigma^2)$ vs $p=\mathcal{N}(0,1)$ we have $D_{KL}(q\|p) = \mathbb{E}_q[\log q] - \mathbb{E}_q[\log p]$. Working these out, $\mathbb{E}_q[\log q] = -\tfrac{1}{2}\log(2\pi\sigma^2)-\tfrac{1}{2}$ since the quadratic averages to $\sigma^2$, and $\mathbb{E}_q[\log p] = -\tfrac{1}{2}\log(2\pi)-\tfrac{\sigma^2+\mu^2}{2}$ using $\mathbb{E}_q[z^2]=\sigma^2+\mu^2$. The difference simplifies to $\tfrac{1}{2}(\mu^2+\sigma^2-1-\log\sigma^2)$, and summing over all $m$ components gives
+$$
+D_{KL}(q_\phi(\mathbf{z}\mid\mathbf{x},\mathbf{y})\|p_\theta(\mathbf{z}\mid\mathbf{y})) = -\tfrac{1}{2}\sum_{j=1}^m(1+\log\sigma_j^2-\mu_j^2-\sigma_j^2). \quad\blacksquare
+$$
+
+(c) 
+
+![CVAE generated digits ($10\times 10$)](plots/5(c).png){width=70%}
